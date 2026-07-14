@@ -49,7 +49,12 @@ main:
    call ClearBackground
 
    call handle_input
-   call reposition_player
+
+   mov rdi, enemy
+   call reposition_paddle
+   mov rdi, player
+   call reposition_paddle
+
    mov rdi, enemy
    call draw_paddle
    mov rdi, player
@@ -136,13 +141,14 @@ handle_input:
    pop rbp
    ret
 
-reposition_player:
+reposition_paddle:
    ;; @Todo: Some registers are callee saved and others are caller saved.
    ;;        Look up which registers you need to save and which ones you can discard
    ;;        and modify the assembly accordingly
 
    push rbp
    mov rbp, rsp
+   mov r12, rdi
 
    mov eax, __float32__(400.0) ;; Center x
    mov ebx, __float32__(300.0) ;; Center y
@@ -153,7 +159,7 @@ reposition_player:
    movd xmm0, [PI]
    movd xmm1, esi
    divss xmm0, xmm1
-   movd xmm1, [player.z]
+   movd xmm1, [r12+8]
    mulss xmm1, xmm0
    movd esi, xmm1
    push rsi
@@ -198,8 +204,8 @@ reposition_player:
    pop r8         ;; x
 
    movd xmm1, r8d
-   movd [player.x], xmm1
-   movd [player.y], xmm0
+   movd [r12], xmm1
+   movd [r12+4], xmm0
 
    ;; dy = cy - y
    movd xmm0, ebx
@@ -227,7 +233,7 @@ reposition_player:
    mov eax, __float32__(90.0) ;; offset
    movd xmm0, eax
    addss xmm2, xmm0
-   movd [player.rotation], xmm2
+   movd [r12+20], xmm2
 
    mov rsp, rbp
    pop rbp
@@ -255,7 +261,7 @@ align 4
 enemy:
    enemy.x:        dd 400.0
    enemy.y:        dd 300.0
-   enemy.z:        dd 100.0
+   enemy.z:        dd 180.0
    enemy.width:    dd 150.0
    enemy.height:   dd 25.0
    enemy.rotation: dd 0.0
