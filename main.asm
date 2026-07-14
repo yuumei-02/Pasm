@@ -1,3 +1,6 @@
+BITS 64
+DEFAULT REL
+
 global _start
 section .text
 
@@ -23,9 +26,9 @@ main:
    push rbp
    mov rbp, rsp
 
-   mov rdi, 800
-   mov rsi, 600
-   mov rdx, WIN_TITLE
+   mov rdi, [WINDOW_DIMENSIONS]
+   mov rsi, [WINDOW_DIMENSIONS+4]
+   mov rdx, WINDOW_TITLE
    call InitWindow
 
 .window_loop_cond:
@@ -74,9 +77,9 @@ draw_player:
    ret
 
 section .data
-WIN_WIDTH: dd 800
-WIN_HEIGHT: dd 600
-WIN_TITLE: db "Pasm", 0
+WINDOW_DIMENSIONS:
+   dd 800 ;; width
+   dd 600 ;; height
 
 PADDLE_RECT:
    dd 50.0   ;; x
@@ -90,3 +93,6 @@ PADDLE_ORIGIN:
 
 PADDLE_ROTATION: dd 0.0
 PADDLE_COLOR: dd 0xffffffff
+
+WINDOW_TITLE db "Pasm", 0 ;; Title
+
