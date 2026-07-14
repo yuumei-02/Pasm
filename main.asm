@@ -27,6 +27,7 @@ extern DrawFPS
 extern SetConfigFlags
 extern GetRenderWidth
 extern GetRenderHeight
+extern DrawCircleV
 
 _start:
    xor rbp, rbp
@@ -70,6 +71,9 @@ main:
    mov rdi, player
    call reposition_paddle
 
+   call update_ball
+   call draw_ball
+
    mov rdi, enemy
    call draw_paddle
    mov rdi, player
@@ -88,6 +92,23 @@ main:
    pop rbp
    ret
 
+draw_ball:
+   push rbp
+   mov rbp, rsp
+
+   movq xmm0, [ball]
+   movd xmm1, [ball.size]
+   mov edi, [BALL_COLOR]
+
+   call DrawCircleV
+
+   mov rsp, rbp
+   pop rbp
+   ret
+
+;; rdi: Paddle* paddle
+;; ---
+;; void
 draw_paddle:
    push rbp
    mov rbp, rsp
@@ -111,6 +132,21 @@ draw_paddle:
 
    call DrawRectanglePro
 
+   mov rsp, rbp
+   pop rbp
+   ret
+
+update_ball:
+   push rbp
+   mov rbp, rsp
+
+   mov eax, [ball_launched]
+   test eax, eax
+   jnz .over
+.ball_not_launched:
+   mov rax, [player.x]
+   mov [ball.x], rax
+.over:
    mov rsp, rbp
    pop rbp
    ret
@@ -259,7 +295,7 @@ reposition_paddle:
    ;; angle_rad = angle_to_rad(paddle rotation)
    movd xmm0, [rbx+8]
    call angle_to_rad
-   movd r15d, xmm0 ;; Temporarely save angle_rad
+   movd r15d, xmm0 ;; Temporarly save angle_rad
 
    ;; x = cx + (distance * cos(angle_rad))
    call cosf
@@ -315,8 +351,8 @@ WINDOW:
 
 align 4
 player:
-   player.x:        dd 400.0
-   player.y:        dd 300.0
+   player.x:        dd 0.0
+   player.y:        dd 0.0
    player.z:        dd 0.0
    player.width:    dd 150.0
    player.height:   dd 25.0
@@ -325,18 +361,31 @@ player:
 
 align 4
 enemy:
-   enemy.x:        dd 400.0
-   enemy.y:        dd 300.0
+   enemy.x:        dd 0.0
+   enemy.y:        dd 0.0
    enemy.z:        dd 180.0
    enemy.width:    dd 150.0
    enemy.height:   dd 25.0
    enemy.rotation: dd 0.0
    align 4
 
+align 4
+ball:
+   ball.x:      dd 0.0
+   ball.y:      dd 0.0
+   ball.vx:     dd 0.0
+   ball.vy:     dd 0.0
+   ball.size:   dd 25.0
+   align 4
+
+ball_launched: dd 0
+
 ;; Game settings
+BALL_SPEED:    dd 100.0
 PADDLE_SPEED:  dd 200.0
-PLAYING_FIELD: dd 600.0
+PLAYING_FIELD: dd 375.0
 PADDLE_COLOR:  dd 0xffffffff
+BALL_COLOR:    dd 0xffffffff
 
 ;; Math constants
 RAD_AND_DEG_CONST: dd 180.0
@@ -344,8 +393,8 @@ PI: dd 3.14159265358979323846
 
 align 4
 PADDLE_ORIGIN:
-   dd 75.0 ;; x
-   dd 150.0 ;; y
+   dd 75.0  ;; x
+   dd -75.0 ;; y
    align 4
 
 debug_i32_fmt: db "%d", 10, 0
