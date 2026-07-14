@@ -231,12 +231,14 @@ reposition_player:
    ret
 
 section .data
+align 4
 WINDOW:
    WINDOW.width:  dd 800
    WINDOW.height: dd 600
    WINDOW.title:  db "Pasm", 0
-   align 8
+   align 4
 
+align 4
 player:
    player.x:        dd 400.0
    player.y:        dd 300.0
@@ -244,7 +246,9 @@ player:
    player.width:    dd 150.0
    player.height:   dd 25.0
    player.rotation: dd 0.0
+   align 4
 
+align 4
 PADDLE_ORIGIN:
    dd 75.0 ;; x
    dd 150.0 ;; y
