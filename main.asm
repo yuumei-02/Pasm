@@ -23,6 +23,8 @@ extern ClearBackground
 extern DrawRectanglePro
 extern GetFrameTime
 extern IsKeyDown
+extern DrawFPS
+extern SetConfigFlags
 
 _start:
    xor rbp, rbp
@@ -33,6 +35,11 @@ _start:
 main:
    push rbp
    mov rbp, rsp
+
+   ;;       0x00000040 // VSYNC
+   ;;       0x00002000 // HIGHDPI support
+   mov rdi, 0x00002040
+   call SetConfigFlags
 
    mov rdi, [WINDOW.width]
    mov rsi, [WINDOW.height]
@@ -59,6 +66,10 @@ main:
    call draw_paddle
    mov rdi, player
    call draw_paddle
+
+   xor rdi, rdi
+   xor rsi, rsi
+   call DrawFPS
 
    call EndDrawing
    jmp .window_loop_cond
