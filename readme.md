@@ -2,6 +2,9 @@
 Pasm is a pong clone written in x86-64 assembly using raylib.
 This project was made as a learning exercise to improve my understanding of x86-64 assembly language
 
+# Status
+Not yet finished!
+
 # Dependencies
 - [Raylib (I used 5.5)](https://github.com/raysan5/raylib)
 - [Nasm](https://www.nasm.us/)
