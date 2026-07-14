@@ -142,11 +142,58 @@ update_ball:
 
    mov eax, [ball_launched]
    test eax, eax
-   jnz .over
+   jnz .ball_launched
 .ball_not_launched:
    mov rax, [player.x]
    mov [ball.x], rax
+   jmp .over
+.ball_launched:
+   movd xmm0, [ball.x]
+   movd xmm1, [ball.y]
+   movd xmm2, [ball.vx]
+   movd xmm3, [ball.vy]
+
+   addss xmm0, xmm2
+   addss xmm1, xmm3
+
+   movd [ball.x], xmm0
+   movd [ball.y], xmm1
 .over:
+   mov rsp, rbp
+   pop rbp
+   ret
+
+;; xmm0: f32 launch paddle rotation
+;; ---
+;; void
+launch_ball:
+   push rbp
+   mov rbp, rsp
+
+   ;; @Todo: early return when the ball has already been launched.
+   mov eax, [ball_launched]
+   test eax, eax
+   jnz .early_out
+
+   call angle_to_rad
+   movd ebx, xmm0
+
+   call cosf
+   movss xmm1, [BALL_SPEED]
+   movss xmm2, [FLOAT_NEG_MASK]
+   xorps xmm1, xmm2
+   mulss xmm1, xmm0
+   movss [ball.vx], xmm1
+
+   movd xmm0, ebx
+   call sinf
+   movss xmm1, [BALL_SPEED]
+   movss xmm2, [FLOAT_NEG_MASK]
+   xorps xmm1, xmm2
+   mulss xmm1, xmm0
+   movss [ball.vy], xmm1
+
+.early_out:
    mov rsp, rbp
    pop rbp
    ret
@@ -192,6 +239,17 @@ handle_input:
    addss xmm0, xmm1
    movd [player.z], xmm0
 .KEY_D_END:
+
+.KEY_SPACE_COND:
+   mov rdi, 32
+   call IsKeyDown
+   test rax, 65
+   jz .KEY_SPACE_END
+.KEY_SPACE_BODY:
+   movd xmm0, [player.z]
+   call launch_ball
+   mov dword [ball_launched], 1
+.KEY_SPACE_END:
    mov rsp, rbp
    pop rbp
    ret
@@ -381,7 +439,7 @@ ball:
 ball_launched: dd 0
 
 ;; Game settings
-BALL_SPEED:    dd 100.0
+BALL_SPEED:    dd 10.0
 PADDLE_SPEED:  dd 200.0
 PLAYING_FIELD: dd 375.0
 PADDLE_COLOR:  dd 0xffffffff
@@ -390,6 +448,7 @@ BALL_COLOR:    dd 0xffffffff
 ;; Math constants
 RAD_AND_DEG_CONST: dd 180.0
 PI: dd 3.14159265358979323846
+FLOAT_NEG_MASK: dd 0x80000000
 
 align 4
 PADDLE_ORIGIN:
@@ -399,4 +458,5 @@ PADDLE_ORIGIN:
 
 debug_i32_fmt: db "%d", 10, 0
 debug_i32_i32_fmt: db "%d | %d", 10, 0
+debug_f32_f32_fmt: db "%f | %f", 10, 0
 
