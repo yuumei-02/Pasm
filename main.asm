@@ -50,7 +50,10 @@ main:
 
    call handle_input
    call reposition_player
-   call draw_player
+   mov rdi, enemy
+   call draw_paddle
+   mov rdi, player
+   call draw_paddle
 
    call EndDrawing
    jmp .window_loop_cond
@@ -61,22 +64,22 @@ main:
    pop rbp
    ret
 
-draw_player:
+draw_paddle:
    push rbp
    mov rbp, rsp
 
    ;; Rectangle
    pxor xmm0, xmm0
    pxor xmm2, xmm2
-   mov  rdx,  [player.x] ;; Includes y
-   movq xmm1, [player.width] ;; Includes height
+   mov  rdx,  [rdi]    ;; x and y
+   movq xmm1, [rdi+12] ;; width and height
    movq xmm0, rdx
 
    ;; Origin
    movq xmm2, [PADDLE_ORIGIN]
 
    ;; Rotation
-   movss xmm3, [player.rotation]
+   movss xmm3, [rdi+20]
 
    ;; Color
    xor edi, edi
@@ -246,6 +249,16 @@ player:
    player.width:    dd 150.0
    player.height:   dd 25.0
    player.rotation: dd 0.0
+   align 4
+
+align 4
+enemy:
+   enemy.x:        dd 400.0
+   enemy.y:        dd 300.0
+   enemy.z:        dd 100.0
+   enemy.width:    dd 150.0
+   enemy.height:   dd 25.0
+   enemy.rotation: dd 0.0
    align 4
 
 align 4
