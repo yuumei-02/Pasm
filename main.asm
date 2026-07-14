@@ -1,15 +1,15 @@
 global _start
 section .text
-_start:
-   mov rax, 1
-   mov rdi, 1
-   mov rsi, msg
-   mov rdx, msg_len
-   syscall
 
-   mov rax, 60
+extern printf
+extern _exit
+
+_start:
+   mov rdi, msg
+   call printf
+
    xor rdi, rdi
-   syscall
+   call _exit
 
 section .data
 msg: db "Zhyivannye miratte!", 10, 0
