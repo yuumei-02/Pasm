@@ -192,112 +192,114 @@ compute_screen_center:
    pop rbp
    ret
 
-;; void
+;; xmm0: f32 rad
+;; ---
+;; xmm0: f32 angle
+rad_to_angle:
+   push rbp
+   mov rbp, rsp
+
+   ;; rad * (180.0 / pi)
+   movd xmm1, [RAD_AND_DEG_CONST]
+   movd xmm2, [PI]
+   divss xmm1, xmm2
+   mulss xmm0, xmm1
+
+   ;; 90 deg offset
+   mov eax, __float32__(90.0)
+   movd xmm1, eax
+   addss xmm0, xmm1
+
+   mov rsp, rbp
+   pop rbp
+   ret
+
+;; xmm0: f32 angle
+;; ---
+;; xmm0: f32 rad
+angle_to_rad:
+   ;; @Todo: Make macros for common operations such as procedure prologue and epilogue
+   push rbp
+   mov rbp, rsp
+   movss xmm2, xmm0
+
+   ;; converter = PI / 180.0
+   movd xmm0, [RAD_AND_DEG_CONST]
+   movd xmm1, [PI]
+   divss xmm1, xmm0
+
+   ;; rotation * converter
+   movss xmm0, xmm2
+   mulss xmm0, xmm1
+   
+   mov rsp, rbp
+   pop rbp
+   ret
+
+;; rdi: Paddle* addr
 ;; ---
 ;; void
 reposition_paddle:
-   ;; @Todo: Some registers are callee saved and others are caller saved.
-   ;;        Look up which registers you need to save and which ones you can discard
-   ;;        and modify the assembly accordingly
-
    push rbp
    mov rbp, rsp
-   mov r12, rdi
 
-   ;; edi: i32 screen-width
-   ;; esi: i32 screen-height
-   ;; ---
-   ;; xmm0: f32 center-x
-   ;; xmm1: f32 center-y
-  
+   ;; rbx: Paddle* paddle
+   ;; r12d: f32 cx
+   ;; r13d: f32 cy
+   ;; r14d: f32 x
+   ;; r15d: f32 y
+   mov rbx, rdi
+
    mov edi, [WINDOW.width]
    mov esi, [WINDOW.height]
    call compute_screen_center
-   movd eax, xmm0
-   movd ebx, xmm1
+   movd r12d, xmm0
+   movd r13d, xmm1
 
-   mov ecx, __float32__(300.0) ;; Distance
+   ;; angle_rad = angle_to_rad(paddle rotation)
+   movd xmm0, [rbx+8]
+   call angle_to_rad
+   movd r15d, xmm0 ;; Temporarely save angle_rad
 
-   ;; angle_rad = rotation * (PI / 180.0)
-   mov esi, __float32__(180.0)
-   movd xmm0, [PI]
-   movd xmm1, esi
-   divss xmm0, xmm1
-   movd xmm1, [r12+8]
-   mulss xmm1, xmm0
-   movd esi, xmm1
-   push rsi
-
-   ;; x = cx + distance * cos(angle_rad)
-   ;; cos(angle_rad)
-   push rax
-   push rbx
-   push rcx
-   movss xmm0, xmm1
+   ;; x = cx + (distance * cos(angle_rad))
    call cosf
-   pop rcx
-   pop rbx
-   pop rax
-   ;; distance * cos(angle_rad)
-   movd xmm1, ecx
+   movd xmm1, [PLAYING_FIELD]
    mulss xmm1, xmm0
-   ;; cx + distance
-   movd xmm0, eax
+   movd xmm0, r12d
    addss xmm0, xmm1
-   movd esi, xmm0
-   pop r8 ;; angle_rad
-   push rsi
+   movd r14d, xmm0
 
-   ;; y = cy + distance * sin(angle_rad)
-   ;; sin(angle_rad)
-   push rax
-   push rbx
-   push rcx
-   movd xmm0, r8d
+   ;; y = cy + (distance * sin(angle_rad))
+   movd xmm0, r15d
    call sinf
-   pop rcx
-   pop rbx
-   pop rax
-   ;; distance * sin(angle_rad)
-   movd xmm1, ecx
+   movd xmm1, [PLAYING_FIELD]
    mulss xmm1, xmm0
-   ;; cy + distance
-   movd xmm0, ebx
+   movd xmm0, r13d
    addss xmm0, xmm1
-   movd r9d, xmm0 ;; y
-   pop r8         ;; x
+   movd r15d, xmm0
 
+   ;; Save x and y to paddle.x and paddle.y
    movd xmm1, r8d
-   movd [r12], xmm1
-   movd [r12+4], xmm0
+   mov dword [rbx], r14d
+   mov dword [rbx+4], r15d
 
-   ;; dy = cy - y
-   movd xmm0, ebx
-   movd xmm1, r9d
-   subss xmm0, xmm1
-   movd r9d, xmm0
+   ;; xmm0: f32 dy
+   ;; xmm1: f32 dx
 
    ;; dx = cx - x
-   movd xmm0, eax
-   movd xmm1, r8d
-   subss xmm0, xmm1
-   movss xmm1, xmm0
+   movd xmm1, r12d
+   movd xmm0, r14d
+   subss xmm1, xmm0
 
-   ;; rad = atan2f(dy, dx)
-   movd xmm0, r9d
+   ;; dy = cy - y
+   movd xmm2, r15d
+   movd xmm0, r13d
+   subss xmm0, xmm2
+
+   ;; new paddle rotation = atan2f(dy, dx) * (180.0 / pi)
    call atan2f
-   movss xmm2, xmm0
-
-   ;; rad * (180.0 / pi)
-   mov eax, __float32__(180.0)
-   movd xmm0, eax
-   movd xmm1, [PI]
-   divss xmm0, xmm1
-   mulss xmm2, xmm0
-   mov eax, __float32__(90.0) ;; offset
-   movd xmm0, eax
-   addss xmm2, xmm0
-   movd [r12+20], xmm2
+   call rad_to_angle
+   movd [rbx+20], xmm0
 
    mov rsp, rbp
    pop rbp
@@ -331,16 +333,20 @@ enemy:
    enemy.rotation: dd 0.0
    align 4
 
+;; Game settings
+PADDLE_SPEED:  dd 200.0
+PLAYING_FIELD: dd 600.0
+PADDLE_COLOR:  dd 0xffffffff
+
+;; Math constants
+RAD_AND_DEG_CONST: dd 180.0
+PI: dd 3.14159265358979323846
+
 align 4
 PADDLE_ORIGIN:
    dd 75.0 ;; x
    dd 150.0 ;; y
    align 4
-
-PADDLE_COLOR: dd 0xffffffff
-PADDLE_SPEED: dd 350.0
-
-PI: dd 3.14159265358979323846
 
 debug_i32_fmt: db "%d", 10, 0
 debug_i32_i32_fmt: db "%d | %d", 10, 0
