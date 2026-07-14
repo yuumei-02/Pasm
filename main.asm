@@ -25,6 +25,8 @@ extern GetFrameTime
 extern IsKeyDown
 extern DrawFPS
 extern SetConfigFlags
+extern GetRenderWidth
+extern GetRenderHeight
 
 _start:
    xor rbp, rbp
@@ -38,7 +40,8 @@ main:
 
    ;;       0x00000040 // VSYNC
    ;;       0x00002000 // HIGHDPI support
-   mov rdi, 0x00002040
+   ;;       0x00000004 // Window resizable
+   mov rdi, 0x00002044
    call SetConfigFlags
 
    mov rdi, [WINDOW.width]
@@ -51,6 +54,11 @@ main:
    test rax, rax
    jnz .window_loop_end
 .window_loop_body:
+   call GetRenderWidth
+   mov dword [WINDOW.width], eax
+   call GetRenderHeight
+   mov dword [WINDOW.height], eax
+
    call BeginDrawing
    mov rdi, 0xFF181818
    call ClearBackground
@@ -152,6 +160,41 @@ handle_input:
    pop rbp
    ret
 
+;; edi: i32 screen-width
+;; esi: i32 screen-height
+;; ---
+;; xmm0: f32 center-x
+;; xmm1: f32 center-y
+compute_screen_center:
+   push rbp
+   mov rbp, rsp
+
+   mov eax, __float32__(2.0)
+   movd xmm1, eax
+   movd xmm2, eax
+
+.handle_width:
+   cvtsi2ss xmm0, edi
+   test edi, edi
+   jz .handle_height
+.cx_is_non_zero:
+   divss xmm0, xmm1
+
+.handle_height:
+   cvtsi2ss xmm1, esi
+   test esi, esi
+   jz .over
+.cy_is_non_zero:
+   divss xmm1, xmm2
+
+.over:
+   mov rsp, rbp
+   pop rbp
+   ret
+
+;; void
+;; ---
+;; void
 reposition_paddle:
    ;; @Todo: Some registers are callee saved and others are caller saved.
    ;;        Look up which registers you need to save and which ones you can discard
@@ -161,9 +204,19 @@ reposition_paddle:
    mov rbp, rsp
    mov r12, rdi
 
-   mov eax, __float32__(400.0) ;; Center x
-   mov ebx, __float32__(300.0) ;; Center y
-   mov ecx, __float32__(350.0) ;; Distance
+   ;; edi: i32 screen-width
+   ;; esi: i32 screen-height
+   ;; ---
+   ;; xmm0: f32 center-x
+   ;; xmm1: f32 center-y
+  
+   mov edi, [WINDOW.width]
+   mov esi, [WINDOW.height]
+   call compute_screen_center
+   movd eax, xmm0
+   movd ebx, xmm1
+
+   mov ecx, __float32__(300.0) ;; Distance
 
    ;; angle_rad = rotation * (PI / 180.0)
    mov esi, __float32__(180.0)
@@ -290,4 +343,5 @@ PADDLE_SPEED: dd 350.0
 PI: dd 3.14159265358979323846
 
 debug_i32_fmt: db "%d", 10, 0
+debug_i32_i32_fmt: db "%d | %d", 10, 0
 
