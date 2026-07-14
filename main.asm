@@ -15,9 +15,6 @@ extern DrawRectanglePro
 
 _start:
    xor rbp, rbp
-   and rsp, -16
-   sub rsp, 8
-
    call main
    xor rdi, rdi
    call _exit
@@ -25,7 +22,6 @@ _start:
 main:
    push rbp
    mov rbp, rsp
-   sub rsp, 40
 
    mov rdi, 800
    mov rsi, 600
