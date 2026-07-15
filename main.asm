@@ -72,6 +72,7 @@ main:
    call reposition_paddle
 
    call update_ball
+   call handle_ball_collision
    call draw_ball
 
    mov rdi, enemy
@@ -282,6 +283,102 @@ compute_screen_center:
    divss xmm1, xmm2
 
 .over:
+   mov rsp, rbp
+   pop rbp
+   ret
+
+;; xmm0: f32 val
+;; xmm1: f32 min
+;; xmm2: f32 max
+;; ---
+;; xmm0: f32 val
+clamp_f32:
+   push rbp
+   mov rbp, rsp
+
+   comiss xmm0, xmm1
+   ja .more_than_min
+.less_than_min:
+   movss xmm0, xmm1
+   jmp .return
+.more_than_min:
+   comiss xmm0, xmm2
+   jb  .return
+.more_than_max:
+   movss xmm0, xmm2
+
+.return:
+   pop rsp, rbp
+   pop rbp
+   ret
+
+;; rdi: Paddle* paddle
+;; ---
+;; xmm0: f32 left
+;; xmm1: f32 right
+;; xmm2: f32 top
+;; xmm3: f32 bottom
+calculate_enemy_bounds:
+   push rbp
+   mov rbp, rsp
+
+   ;; paddle.width / 2.0f
+   mov eax, __float32__(2.0)
+   movd xmm4, eax
+   movss xmm5, [rdi+12]
+   divss xmm5, xmm4
+
+   ;; paddle.height / 2.0f
+   movss xmm6, [rdi+16]
+   divss xmm6, xmm4
+
+   ;; xmm5: paddle.width / 2.0f
+   ;; xmm6: paddle.height / 2.0f
+
+   ;; left
+   movss xmm0, [rdi]
+   subss xmm0, xmm5
+
+   ;; right
+   movss xmm1, [rdi]
+   addss xmm1, xmm5
+
+   ;; top
+   movss xmm2, [rdi+4]
+   addss xmm2, xmm6
+
+   ;; bottom
+   movss xmm3, [rdi+4]
+   subss xmm3, xmm6
+
+   mov rsp, rbp
+   pop rbp
+   ret
+
+;; xmm0: f32 left
+;; xmm1: f32 right
+;; xmm2: f32 top
+;; xmm3: f32 bottom
+;; ---
+;; xmm0: f32 closest_x
+;; xmm1: f32 closest_y
+calculate_closest_point_on_paddle_to_ball_center:
+   push rbp
+   mov rbp, rsp
+
+   mov rsp, rbp
+   pop rbp
+   ret
+
+;; rdi: Paddle* paddle
+;; ---
+;; void
+handle_ball_collision:
+   push rbp
+   mov rbp, rsp
+
+   call calculate_enemy_bounds
+
    mov rsp, rbp
    pop rbp
    ret
