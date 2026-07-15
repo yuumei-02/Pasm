@@ -72,6 +72,9 @@ main:
    call reposition_paddle
 
    call update_ball
+   mov rdi, enemy
+   call handle_ball_collision
+   mov rdi, player
    call handle_ball_collision
    call draw_ball
 
