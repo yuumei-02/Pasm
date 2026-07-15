@@ -308,7 +308,7 @@ clamp_f32:
    movss xmm0, xmm2
 
 .return:
-   pop rsp, rbp
+   mov rsp, rbp
    pop rbp
    ret
 
@@ -366,6 +366,168 @@ calculate_closest_point_on_paddle_to_ball_center:
    push rbp
    mov rbp, rsp
 
+   push r12
+   push r13
+   push r14
+   sub rsp, 8
+
+   movd r12d, xmm2
+   movd r13d, xmm3
+
+   movss xmm2, xmm1
+   movss xmm1, xmm0
+   movss xmm0, [ball.x]
+   call clamp_f32
+   movd r14d, xmm0 ;; closest_x
+
+   movss xmm0, [ball.y]
+   movd xmm1, r13d
+   movd xmm2, r12d
+   call clamp_f32
+   movss xmm1, xmm0
+   movd xmm0, r14d
+
+   add rsp, 8
+   pop r14
+   pop r13
+   pop r12
+
+   mov rsp, rbp
+   pop rbp
+   ret
+
+;; xmm0: f32 closest_x
+;; xmm1: f32 closest_y
+;; ---
+;; xmm0: f32 dist_sq
+;; xmm1: f32 radius_sq
+calculate_distance_from_ball_to_closest_point:
+   push rbp
+   mov rbp, rsp
+
+   ;; xmm2: f32 dx
+   ;; xmm3: f32 dy
+   movss xmm2, [ball.x]
+   movss xmm3, [ball.y]
+   subss xmm2, xmm0
+   subss xmm3, xmm1
+
+   ;; dist_sq
+   mulss xmm2, xmm2
+   mulss xmm3, xmm3
+   addss xmm2, xmm3
+   movss xmm0, xmm2
+
+   ;; radius_sq
+   movss xmm1, [ball.size]
+   mulss xmm1, xmm1
+
+   mov rsp, rbp
+   pop rbp
+   ret
+
+;; xmm0: f32 left
+;; xmm1: f32 right
+;; xmm2: f32 top
+;; xmm3: f32 bottom
+;; ---
+;; xmm0: f32 overlap_left
+;; xmm1: f32 overlap_right
+;; xmm2: f32 overlap_top
+;; xmm3: f32 overlap_bottom
+calculate_ball_overlap:
+   push rbp
+   mov rbp, rsp
+
+   ;; overlap_left
+   movss xmm4, [ball.x]
+   addss xmm4, [ball.size]
+   subss xmm4, xmm0
+
+   ;; overlap_right
+   movss xmm4, [ball.x]
+   subss xmm4, [ball.size]
+   subss xmm1, xmm4
+
+   ;; overlap_top
+   movss xmm4, [ball.y]
+   addss xmm4, [ball.size]
+   subss xmm4, xmm2
+   movss xmm2, xmm4
+
+   ;; overlap_bottom
+   movss xmm4, [ball.y]
+   subss xmm4, [ball.size]
+   subss xmm3, xmm4
+
+   mov rsp, rbp
+   pop rbp
+   ret
+
+;; xmm0: f32 overlap_left
+;; xmm1: f32 overlap_right
+;; xmm2: f32 overlap_top
+;; xmm3: f32 overlap_bottom
+;; ---
+;; eax: i32 collision_side
+calculate_collision_side:
+   push rbp
+   mov rbp, rsp
+
+   ;; xmm4: f32 min_overlap
+   ;; eax: f32 collision_side
+   movss xmm4, xmm0
+   xor eax, eax
+
+.right_cond:
+   ucomiss xmm1, xmm4
+   jae .right_over
+.right_body:
+   movss xmm4, xmm1
+   mov eax, 1
+.right_over:
+
+.top_cond:
+   ucomiss xmm2, xmm4
+   jae .top_over
+.top_body:
+   movss xmm4, xmm2
+   mov eax, 2
+.top_over:
+
+.bottom_cond:
+   ucomiss xmm3, xmm4
+   jae .bottom_over
+.bottom_body:
+   movss xmm4, xmm3
+   mov eax, 3
+.bottom_over:
+   mov rsp, rbp
+   pop rbp
+   ret
+
+;; edi: i32 collision_side
+;; ---
+;; void
+bounce_ball_from_collision_side:
+   push rbp
+   mov rbp, rsp
+   movss xmm1, [FLOAT_NEG_MASK]
+
+   test edi, edi
+   je .reverse_x
+   cmp edi, 1
+   jne .reverse_y
+.reverse_x:
+   movss xmm0, [ball.vx]
+   xorps xmm0, xmm1
+   movss [ball.vx], xmm0
+   jmp .finish
+.reverse_y:
+   movss xmm0, [ball.vy]
+   xorps xmm0, xmm1
+   movss [ball.vy], xmm0
+.finish:
    mov rsp, rbp
    pop rbp
    ret
@@ -377,7 +539,57 @@ handle_ball_collision:
    push rbp
    mov rbp, rsp
 
+   push r12
+   push r13
+   push r14
+   push r15
+
    call calculate_enemy_bounds
+   ;; xmm0: f32 left
+   ;; xmm1: f32 right
+   ;; xmm2: f32 top
+   ;; xmm3: f32 bottom
+
+   movd r12d, xmm0
+   movd r13d, xmm1
+   movd r14d, xmm2
+   movd r15d, xmm3
+
+   call calculate_closest_point_on_paddle_to_ball_center
+   ;; xmm0: f32 closest_x
+   ;; xmm1: f32 closest_y
+
+   call calculate_distance_from_ball_to_closest_point
+   ;; xmm0: f32 dist_sq
+   ;; xmm1: f32 radius_sq
+
+   ucomiss xmm0, xmm1
+   ja .early_out
+.collision_detected:
+   movd xmm0, r12d
+   movd xmm1, r13d
+   movd xmm2, r14d
+   movd xmm3, r15d
+   call calculate_ball_overlap
+   ;; xmm0: f32 overlap_left
+   ;; xmm1: f32 overlap_right
+   ;; xmm2: f32 overlap_top
+   ;; xmm3: f32 overlap_bottom
+
+   call calculate_collision_side
+   ;; eax: i32 collision_side
+   mov edi, eax
+   call bounce_ball_from_collision_side
+
+   ;; mov rdi, debug_i32_fmt
+   ;; mov rsi, 69420
+   ;; xor rax, rax
+   ;; call printf
+.early_out:
+   pop r15
+   pop r14
+   pop r13
+   pop r12
 
    mov rsp, rbp
    pop rbp
